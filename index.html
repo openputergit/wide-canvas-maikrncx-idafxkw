@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wellness AI Assistant</title>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-green-50 min-h-screen font-['Inter']">
+    <div x-data="wellnessApp()" class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Wellness AI Assistant</h1>
+            <p class="text-gray-600 mb-4">Your personal health and wellness companion</p>
+            
+            <!-- Category Pills -->
+            <div class="flex flex-wrap justify-center gap-2 mb-6">
+                <button @click="setCategory('fitness')" :class="{'bg-blue-500 text-white': category === 'fitness', 'bg-white text-gray-700 hover:bg-gray-100': category !== 'fitness'}" class="px-4 py-2 rounded-full shadow-sm transition-all">
+                    <i class="bi bi-activity"></i> Fitness
+                </button>
+                <button @click="setCategory('nutrition')" :class="{'bg-green-500 text-white': category === 'nutrition', 'bg-white text-gray-700 hover:bg-gray-100': category !== 'nutrition'}" class="px-4 py-2 rounded-full shadow-sm transition-all">
+                    <i class="bi bi-egg-fried"></i> Nutrition
+                </button>
+                <button @click="setCategory('mental')" :class="{'bg-purple-500 text-white': category === 'mental', 'bg-white text-gray-700 hover:bg-gray-100': category !== 'mental'}" class="px-4 py-2 rounded-full shadow-sm transition-all">
+                    <i class="bi bi-brain"></i> Mental Health
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <!-- Messages Area -->
+            <div class="h-[500px] overflow-y-auto mb-4 p-4 bg-gray-50 rounded-lg" x-ref="messagesContainer">
+                <!-- Welcome Message -->
+                <div class="mb-4 bg-blue-100 p-4 rounded-lg" x-show="messages.length === 0">
+                    <h3 class="font-semibold text-blue-800 mb-2">👋 Welcome to your Wellness Assistant!</h3>
+                    <p class="text-blue-700">I can help you with:</p>
+                    <ul class="list-disc list-inside text-blue-700 mt-2">
+                        <li>Personalized workout routines</li>
+                        <li>Healthy meal planning</li>
+                        <li>Mental wellness advice</li>
+                        <li>General health questions</li>
+                    </ul>
+                </div>
+
+                <template x-for="(message, index) in messages" :key="index">
+                    <div :class="`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`">
+                        <div :class="`inline-block p-4 rounded-lg max-w-[80%] ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-white border shadow-sm'}`">
+                            <p x-text="message.content" class="break-words"></p>
+                        </div>
+                    </div>
+                </template>
+                
+                <div x-show="isLoading" class="flex justify-center items-center py-4">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+            </div>
+
+            <!-- Error Alert -->
+            <div x-show="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+                <span x-text="error" class="block sm:inline"></span>
+                <button @click="error = ''" class="absolute top-0 right-0 px-4 py-3">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+
+            <!-- Quick Suggestions -->
+            <div class="mb-4 flex flex-wrap gap-2" x-show="!isLoading">
+                <button @click="quickQuestion('Can you suggest a 15-minute home workout?')" class="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full">
+                    🏋️‍♂️ Quick workout suggestion
+                </button>
+                <button @click="quickQuestion('What should I eat for a healthy breakfast?')" class="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full">
+                    🍳 Healthy breakfast ideas
+                </button>
+                <button @click="quickQuestion('Give me a quick stress relief technique')" class="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full">
+                    🧘‍♂️ Stress relief tips
+                </button>
+            </div>
+
+            <!-- Input Area -->
+            <form @submit.prevent="sendMessage" class="flex gap-2">
+                <input 
+                    type="text" 
+                    x-model="userInput"
+                    :disabled="isLoading"
+                    class="flex-1 p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    :placeholder="getPlaceholder()"
+                >
+                <button 
+                    type="submit"
+                    :disabled="isLoading || !userInput.trim()"
+                    class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <i class="bi bi-send"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function wellnessApp() {
+            return {
+                messages: [],
+                userInput: '',
+                isLoading: false,
+                error: '',
+                category: 'fitness',
+                
+                getPlaceholder() {
+                    const placeholders = {
+                        fitness: "Ask about workouts, exercises, or fitness goals...",
+                        nutrition: "Ask about meal plans, recipes, or dietary advice...",
+                        mental: "Ask about stress management, meditation, or mental wellness..."
+                    };
+                    return placeholders[this.category];
+                },
+
+                setCategory(cat) {
+                    this.category = cat;
+                },
+
+                quickQuestion(question) {
+                    this.userInput = question;
+                    this.sendMessage();
+                },
+
+                async sendMessage() {
+                    if (!this.userInput.trim()) return;
+                    
+                    const userMessage = {
+                        role: 'user',
+                        content: this.userInput.trim()
+                    };
+                    
+                    this.messages.push(userMessage);
+                    this.userInput = '';
+                    this.isLoading = true;
+                    this.error = '';
+
+                    try {
+                        const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/ai', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer YcyTwD4M0vWsVcFGUMoq9ex7cvy2'
+                            },
+                            body: JSON.stringify({
+                                messages: [
+                                    {
+                                        role: 'system',
+                                        content: `You are a wellness AI assistant specializing in ${this.category}. Provide helpful, accurate, and safe advice.`
+                                    },
+                                    {
+                                        role: 'user',
+                                        content: [{
+                                            type: 'text',
+                                            text: userMessage.content
+                                        }]
+                                    }
+                                ]
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to get response from AI');
+                        }
+
+                        const data = await response.json();
+                        
+                        this.messages.push({
+                            role: 'assistant',
+                            content: data.message
+                        });
+
+                    } catch (err) {
+                        console.error('Error:', err);
+                        this.error = 'An error occurred. Please try again later.';
+                    } finally {
+                        this.isLoading = false;
+                        this.$nextTick(() => {
+                            this.$refs.messagesContainer.scrollTop = this.$refs.messagesContainer.scrollHeight;
+                        });
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .overflow-y-auto::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
